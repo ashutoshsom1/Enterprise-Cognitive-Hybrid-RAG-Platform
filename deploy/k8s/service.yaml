@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: enterprise-rag-service
+  namespace: default
+  labels:
+    app.kubernetes.io/name: enterprise-hybrid-rag
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: enterprise-hybrid-rag
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

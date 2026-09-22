@@ -1,0 +1,15 @@
+-r requirements.txt
+
+# Testing and Coverage
+pytest==8.2.2
+pytest-asyncio==0.23.7
+pytest-cov==5.0.0
+
+# Code Quality & Formatting
+ruff==0.4.8
+mypy==1.10.0
+black==24.4.2
+
+# Optional Evaluation
+ragas>=0.1.9
+datasets>=2.19.0
