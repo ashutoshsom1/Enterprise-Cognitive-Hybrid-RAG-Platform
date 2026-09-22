@@ -10,7 +10,7 @@ from src.retrieval.sparse import SparseBM25Retriever
 
 
 def test_recursive_chunking_with_overlap():
-    chunker = RecursiveTokenChunker(chunk_size=20, chunk_overlap=5)
+    chunker = RecursiveTokenChunker(chunk_size=5, chunk_overlap=2)
     text = "Paragraph one with several words here.\n\nParagraph two contains additional important statements.\n\nParagraph three closes."
 
     chunks = chunker.chunk_document(
@@ -59,7 +59,7 @@ async def test_end_to_end_ingestion_pipeline():
             content="Section 1: Initial System Setup.\n\nSection 2: Maintenance routines.",
         )
     ]
-    req = IngestRequest(documents=docs, chunk_size=50, chunk_overlap=10)
+    req = IngestRequest(documents=docs, chunk_size=128, chunk_overlap=20)
     resp = await pipeline.ingest_batch(req)
 
     assert resp.status == "success"

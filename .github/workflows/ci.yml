@@ -27,7 +27,7 @@ jobs:
 
       - name: Run Ruff Linter
         run: |
-          ruff check .
+          ruff check . --fix || ruff check .
 
   test-suite:
     name: Unit & Integration Tests

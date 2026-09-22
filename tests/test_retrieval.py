@@ -1,7 +1,6 @@
 """Tests for Dense and Sparse retrieval engines."""
 
 import pytest
-from src.api.schemas import DocumentChunk, DocumentMetadata
 from src.retrieval.dense import DenseRetriever
 from src.retrieval.sparse import SparseBM25Retriever
 

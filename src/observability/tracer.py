@@ -1,6 +1,5 @@
 """OpenTelemetry distributed tracing setup."""
 
-from typing import Optional
 from config.logging_config import get_logger
 from config.settings import get_settings
 

@@ -2,7 +2,6 @@
 
 import time
 import pytest
-import numpy as np
 from src.cache.memory_cache import MemorySemanticCache
 
 

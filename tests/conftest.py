@@ -4,7 +4,7 @@ import pytest
 from typing import List
 
 from config.settings import Settings
-from src.api.schemas import DocumentChunk, DocumentMetadata, ScoredChunk
+from src.api.schemas import DocumentChunk, DocumentMetadata
 from src.api.routes import RAGService
 from src.cache.memory_cache import MemorySemanticCache
 from src.retrieval.dense import DenseRetriever
