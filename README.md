@@ -1,8 +1,8 @@
 # Enterprise Cognitive Hybrid RAG Platform
 
-[![CI](https://github.com/enterprise/hybrid-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/enterprise/hybrid-rag/actions/workflows/ci.yml)
-[![Docker Release](https://github.com/enterprise/hybrid-rag/actions/workflows/cd.yml/badge.svg)](https://github.com/enterprise/hybrid-rag/actions/workflows/cd.yml)
-[![Ragas Evaluation](https://github.com/enterprise/hybrid-rag/actions/workflows/eval.yml/badge.svg)](https://github.com/enterprise/hybrid-rag/actions/workflows/eval.yml)
+[![CI](https://github.com/ashutoshsom1/Enterprise-Cognitive-Hybrid-RAG-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/ashutoshsom1/Enterprise-Cognitive-Hybrid-RAG-Platform/actions/workflows/ci.yml)
+[![Docker Release](https://github.com/ashutoshsom1/Enterprise-Cognitive-Hybrid-RAG-Platform/actions/workflows/cd.yml/badge.svg)](https://github.com/ashutoshsom1/Enterprise-Cognitive-Hybrid-RAG-Platform/actions/workflows/cd.yml)
+[![Ragas Evaluation](https://github.com/ashutoshsom1/Enterprise-Cognitive-Hybrid-RAG-Platform/actions/workflows/eval.yml/badge.svg)](https://github.com/ashutoshsom1/Enterprise-Cognitive-Hybrid-RAG-Platform/actions/workflows/eval.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](pyproject.toml)
 
@@ -98,8 +98,8 @@ Implemented a vector-based semantic cache storing prior query embeddings. Incomi
 ### 1. Clone & Environment Configuration
 
 ```bash
-git clone https://github.com/enterprise/hybrid-rag.git
-cd hybrid-rag
+git clone https://github.com/ashutoshsom1/Enterprise-Cognitive-Hybrid-RAG-Platform.git
+cd Enterprise-Cognitive-Hybrid-RAG-Platform
 
 # Copy environment template
 cp .env.example .env
