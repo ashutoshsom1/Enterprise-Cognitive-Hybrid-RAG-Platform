@@ -11,10 +11,15 @@ except ImportError:
             pass
         def observe(self, *args, **kwargs):
             pass
+    def Counter(*args, **kwargs):
+        return DummyMetric()
 
-    Counter = lambda *args, **kwargs: DummyMetric()
-    Histogram = lambda *args, **kwargs: DummyMetric()
-    generate_latest = lambda: b""
+    def Histogram(*args, **kwargs):
+        return DummyMetric()
+
+    def generate_latest():
+        return b""
+
     CONTENT_TYPE_LATEST = "text/plain"
 
 # Query latency histogram with sub-500ms P99 resolution buckets

@@ -5,7 +5,6 @@ import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from config.logging_config import get_logger, setup_logging
 from config.settings import get_settings

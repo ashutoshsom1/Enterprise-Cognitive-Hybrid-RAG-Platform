@@ -26,9 +26,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          pip install -e .
 
       - name: Run Ragas Suite
         env:
+          PYTHONPATH: .
           ENVIRONMENT: test
           LOG_LEVEL: ERROR
           REDIS_CACHE_ENABLED: false

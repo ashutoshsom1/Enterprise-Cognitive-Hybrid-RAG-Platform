@@ -1,0 +1,5 @@
+-r requirements-dev.txt
+
+# Evaluation Framework
+ragas>=0.1.9
+datasets>=2.19.0

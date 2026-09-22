@@ -1,7 +1,7 @@
 """Multi-provider LLM Synthesis Engine supporting Azure OpenAI, Anthropic, and vLLM."""
 
 import asyncio
-from typing import AsyncGenerator, List, Optional
+from typing import AsyncGenerator, List
 from config.logging_config import get_logger
 from config.settings import get_settings
 from src.api.schemas import ScoredChunk

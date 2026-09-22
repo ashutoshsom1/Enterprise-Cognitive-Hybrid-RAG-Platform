@@ -1,6 +1,6 @@
 """Reciprocal Rank Fusion (RRF) implementation for Hybrid Search."""
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 from src.api.schemas import ScoredChunk
 
 

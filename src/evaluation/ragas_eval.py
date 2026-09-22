@@ -13,14 +13,8 @@ from src.evaluation.benchmark_dataset import GOLDEN_BENCHMARK_DATASET, SAMPLE_EN
 logger = get_logger(__name__)
 
 try:
-    from ragas import evaluate
-    from ragas.metrics import (
-        context_precision,
-        faithfulness,
-        answer_relevancy,
-        context_recall,
-    )
-    from datasets import Dataset
+    import ragas  # noqa: F401
+    import datasets  # noqa: F401
     _RAGAS_AVAILABLE = True
 except ImportError:
     _RAGAS_AVAILABLE = False

@@ -24,7 +24,7 @@ async def benchmark_run(
     total_queries: int = 100,
     concurrency: int = 10,
 ):
-    print(f"Starting Enterprise RAG Benchmark:")
+    print("Starting Enterprise RAG Benchmark:")
     print(f"  Target:      {base_url}")
     print(f"  Queries:     {total_queries}")
     print(f"  Concurrency: {concurrency}")

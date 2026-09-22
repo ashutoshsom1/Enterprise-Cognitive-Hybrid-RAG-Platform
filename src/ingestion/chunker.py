@@ -1,7 +1,6 @@
 """Recursive Token-Aware Document Chunker."""
 
 import hashlib
-import re
 from typing import Any, Dict, List, Optional
 from src.api.schemas import DocumentChunk, DocumentMetadata
 

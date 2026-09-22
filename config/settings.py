@@ -1,6 +1,5 @@
 """Enterprise Cognitive Hybrid RAG Platform Configuration Settings."""
 
-import os
 from functools import lru_cache
 from typing import List, Literal, Optional
 from pydantic import Field

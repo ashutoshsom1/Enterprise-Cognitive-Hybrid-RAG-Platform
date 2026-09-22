@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 from typing import AsyncGenerator, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import StreamingResponse
 
 from config.logging_config import get_logger

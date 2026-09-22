@@ -1,7 +1,6 @@
 """Pytest configuration and shared fixtures."""
 
 import pytest
-import pytest_asyncio
 from typing import List
 
 from config.settings import Settings
