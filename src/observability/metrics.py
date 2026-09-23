@@ -22,6 +22,19 @@ except ImportError:
 
     CONTENT_TYPE_LATEST = "text/plain"
 
+__all__ = [
+    "Counter",
+    "Histogram",
+    "generate_latest",
+    "CONTENT_TYPE_LATEST",
+    "QUERY_LATENCY_HISTOGRAM",
+    "STAGE_LATENCY_HISTOGRAM",
+    "CACHE_HITS_TOTAL",
+    "CACHE_MISSES_TOTAL",
+    "INGESTED_CHUNKS_TOTAL",
+    "record_query_metrics",
+]
+
 # Query latency histogram with sub-500ms P99 resolution buckets
 QUERY_LATENCY_HISTOGRAM = Histogram(
     "rag_query_latency_seconds",

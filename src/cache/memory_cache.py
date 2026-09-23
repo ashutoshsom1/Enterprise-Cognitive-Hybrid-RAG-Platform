@@ -1,6 +1,5 @@
 """High-performance in-memory semantic cache with NumPy vector similarity."""
 
-import json
 import time
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np

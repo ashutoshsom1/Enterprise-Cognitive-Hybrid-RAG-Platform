@@ -120,7 +120,7 @@ class RedisSemanticCache(SemanticCacheBase):
             # Attempt 1: Native RediSearch Vector KNN search
             await self._ensure_index()
             if self._index_initialized:
-                query_str = f"*=>[KNN 1 @vector $query_vec AS vector_score]"
+                query_str = "*=>[KNN 1 @vector $query_vec AS vector_score]"
                 res = await client.execute_command(
                     "FT.SEARCH",
                     self.INDEX_NAME,

@@ -2,9 +2,9 @@
 
 import time
 import uuid
-from typing import List, Optional
+from typing import Optional
 from config.logging_config import get_logger
-from src.api.schemas import IngestDocument, IngestRequest, IngestResponse
+from src.api.schemas import IngestRequest, IngestResponse
 from src.ingestion.chunker import RecursiveTokenChunker
 from src.ingestion.deduplicator import ChunkDeduplicator
 from src.retrieval.dense import DenseRetriever

@@ -1,7 +1,8 @@
 """Ragas Evaluation Framework measuring Context Precision & Faithfulness."""
 
 import asyncio
-from typing import Any, Dict, List
+from importlib.util import find_spec
+from typing import Any, Dict
 import numpy as np
 
 from config.logging_config import get_logger
@@ -12,12 +13,7 @@ from src.evaluation.benchmark_dataset import GOLDEN_BENCHMARK_DATASET, SAMPLE_EN
 
 logger = get_logger(__name__)
 
-try:
-    import ragas  # noqa: F401
-    import datasets  # noqa: F401
-    _RAGAS_AVAILABLE = True
-except ImportError:
-    _RAGAS_AVAILABLE = False
+_RAGAS_AVAILABLE = find_spec("ragas") is not None and find_spec("datasets") is not None
 
 
 class RagasEvaluator:
