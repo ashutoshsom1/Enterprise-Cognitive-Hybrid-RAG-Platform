@@ -116,7 +116,6 @@ async def query_knowledge_base(
     breakdown = StageLatencyBreakdown()
 
     # Step 1: Compute query embedding
-    t_emb0 = time.perf_counter()
     query_vector = await service.dense.get_embedding(request.query)
 
     # Step 2: Semantic Cache Lookup
@@ -242,7 +241,7 @@ async def stream_query_knowledge_base(
             similarity_threshold=request.similarity_threshold or 0.92,
         )
         if cached:
-            cached_answer, cached_sources, _ = cached
+            cached_answer, _, _ = cached
             async def cached_stream():
                 payload = json.dumps({"event": "cache_hit", "content": cached_answer})
                 yield f"data: {payload}\n\n"

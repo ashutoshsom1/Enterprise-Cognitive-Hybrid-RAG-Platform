@@ -134,7 +134,7 @@ class DenseRetriever:
         if self._qdrant_available and self.qdrant_client is not None and qmodels is not None:
             try:
                 points = []
-                for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+                for chunk, emb in zip(chunks, embeddings):
                     points.append(
                         qmodels.PointStruct(
                             id=abs(hash(chunk.metadata.chunk_id)) % (2**63 - 1),

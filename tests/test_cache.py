@@ -33,6 +33,7 @@ async def test_semantic_cache_hit_above_threshold():
     assert hit is not None
     answer, returned_sources, score = hit
     assert answer == "The GPU thermal limit is 90C."
+    assert len(returned_sources) == 1
     assert score >= 0.92
     assert elapsed_ms < 25.0, f"Cache lookup took {elapsed_ms}ms, expected sub-25ms"
 
