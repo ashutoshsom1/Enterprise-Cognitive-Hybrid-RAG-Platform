@@ -55,8 +55,8 @@ class RedisSemanticCache(SemanticCacheBase):
                 self.redis_url,
                 encoding="utf-8",
                 decode_responses=False,
-                socket_timeout=2.0,
-                socket_connect_timeout=2.0,
+                socket_timeout=1.0,
+                socket_connect_timeout=0.5,
             )
         return self.client
 
@@ -66,17 +66,23 @@ class RedisSemanticCache(SemanticCacheBase):
 
     async def _ensure_index(self):
         """Creates RediSearch vector HNSW index if supported by the Redis instance."""
-        if self._index_initialized:
+        if self._index_initialized or self._redis_failed:
             return
         client = await self._get_client()
         if client is None:
+            self._redis_failed = True
             return
 
         try:
             # Check if index exists
             await client.execute_command("FT.INFO", self.INDEX_NAME)
             self._index_initialized = True
-        except Exception:
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "timeout" in err_msg or "refused" in err_msg or "connection" in err_msg:
+                self._redis_failed = True
+                logger.warning(f"Redis connection failed: {e}. Switching to in-memory fallback.")
+                return
             try:
                 # Create HNSW vector index
                 await client.execute_command(
@@ -104,7 +110,12 @@ class RedisSemanticCache(SemanticCacheBase):
                 self._index_initialized = True
                 logger.info(f"Initialized RediSearch HNSW index '{self.INDEX_NAME}' (dim={self.dimension})")
             except Exception as e:
-                logger.warning(f"RediSearch HNSW index creation skipped (standard Redis fallback mode): {e}")
+                err_msg2 = str(e).lower()
+                if "timeout" in err_msg2 or "refused" in err_msg2 or "connection" in err_msg2:
+                    self._redis_failed = True
+                    logger.warning(f"Redis connection failed: {e}. Switching to in-memory fallback.")
+                else:
+                    logger.warning(f"RediSearch HNSW index creation skipped (standard Redis fallback mode): {e}")
                 self._index_initialized = False
 
     async def get(
