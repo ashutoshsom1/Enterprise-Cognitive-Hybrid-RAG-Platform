@@ -16,6 +16,8 @@ async def test_golden_dataset_evaluation_precision():
         RRF_K=60,
         FUSED_TOP_N=10,
         RERANKER_TOP_K=5,
+        DEFAULT_LLM_PROVIDER="openai",
+        EMBEDDING_PROVIDER="openai",
     )
     service = RAGService(test_settings)
     evaluator = RagasEvaluator(service)

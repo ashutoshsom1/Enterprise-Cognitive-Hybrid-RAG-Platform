@@ -12,6 +12,22 @@ from src.retrieval.sparse import SparseBM25Retriever
 from src.retrieval.reranker import CrossEncoderReranker
 
 
+@pytest.fixture(autouse=True)
+def setup_test_env(monkeypatch):
+    """Ensure test suite runs in isolated test environment without calling external services."""
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("DEFAULT_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    from config.settings import get_settings
+    get_settings.cache_clear()
+    import src.api.routes
+    src.api.routes._rag_service = None
+    yield
+    get_settings.cache_clear()
+    src.api.routes._rag_service = None
+
+
 @pytest.fixture
 def test_settings() -> Settings:
     """Provides isolated test configuration."""
@@ -27,6 +43,8 @@ def test_settings() -> Settings:
         RERANKER_TOP_K=3,
         DENSE_TOP_K=10,
         SPARSE_TOP_K=10,
+        DEFAULT_LLM_PROVIDER="openai",
+        EMBEDDING_PROVIDER="openai",
     )
 
 

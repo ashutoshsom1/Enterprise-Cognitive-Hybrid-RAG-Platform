@@ -64,6 +64,7 @@ class RAGService:
             collection_name=settings.QDRANT_COLLECTION_NAME,
             dimension=settings.EMBEDDING_DIMENSION,
             embedding_model=settings.EMBEDDING_MODEL,
+            settings=settings,
         )
         self.sparse = SparseBM25Retriever(
             k1=settings.BM25_K1,
@@ -85,7 +86,7 @@ class RAGService:
         )
 
         # 5. LLM Synthesis
-        self.generator = LLMGenerator()
+        self.generator = LLMGenerator(settings=settings)
 
 
 _rag_service: Optional[RAGService] = None

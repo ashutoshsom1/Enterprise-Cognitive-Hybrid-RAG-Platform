@@ -1,9 +1,11 @@
 """Multi-provider LLM Synthesis Engine supporting Azure OpenAI, Anthropic, and vLLM."""
 
 import asyncio
-from typing import AsyncGenerator, List
+import json
+from typing import AsyncGenerator, List, Optional
+import httpx
 from config.logging_config import get_logger
-from config.settings import get_settings
+from config.settings import Settings, get_settings
 from src.api.schemas import ScoredChunk
 from src.synthesis.prompts import ENTERPRISE_RAG_SYSTEM_PROMPT, build_user_prompt
 
@@ -27,9 +29,11 @@ class LLMGenerator:
     Coordinates grounded contextual synthesis with streaming token delivery.
     """
 
-    def __init__(self):
-        self.settings = get_settings()
+    def __init__(self, settings: Optional[Settings] = None):
+        self.settings = settings or get_settings()
         self.provider = self.settings.DEFAULT_LLM_PROVIDER
+        self.ollama_base_url = self.settings.OLLAMA_BASE_URL
+        self.ollama_model = self.settings.OLLAMA_MODEL
         self.openai_client = None
         self.azure_client = None
         self.anthropic_client = None
@@ -63,7 +67,34 @@ class LLMGenerator:
         """Generates grounded response synchronously."""
         user_prompt = build_user_prompt(query, context_chunks)
 
-        # 1. Azure OpenAI
+        # 1. Local Ollama Synthesis
+        if self.provider == "ollama":
+            try:
+                payload = {
+                    "model": self.ollama_model,
+                    "messages": [
+                        {"role": "system", "content": ENTERPRISE_RAG_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "stream": False,
+                    "options": {
+                        "temperature": self.settings.TEMPERATURE,
+                        "num_predict": self.settings.MAX_TOKENS,
+                    },
+                }
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    resp = await client.post(
+                        f"{self.ollama_base_url}/api/chat",
+                        json=payload,
+                    )
+                    if resp.status_code == 200:
+                        content = resp.json().get("message", {}).get("content", "")
+                        if content:
+                            return content
+            except Exception as e:
+                logger.error(f"Ollama chat call failed: {e}. Falling back to simulation.")
+
+        # 2. Azure OpenAI
         if self.provider == "azure_openai" and self.azure_client is not None:
             try:
                 resp = await self.azure_client.chat.completions.create(
@@ -118,7 +149,41 @@ class LLMGenerator:
         """Streams tokens in real time via async generator."""
         user_prompt = build_user_prompt(query, context_chunks)
 
-        # 1. Azure OpenAI Streaming
+        # 1. Local Ollama Streaming
+        if self.provider == "ollama":
+            try:
+                payload = {
+                    "model": self.ollama_model,
+                    "messages": [
+                        {"role": "system", "content": ENTERPRISE_RAG_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "stream": True,
+                    "options": {
+                        "temperature": self.settings.TEMPERATURE,
+                        "num_predict": self.settings.MAX_TOKENS,
+                    },
+                }
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    async with client.stream(
+                        "POST",
+                        f"{self.ollama_base_url}/api/chat",
+                        json=payload,
+                    ) as resp:
+                        async for line in resp.aiter_lines():
+                            if line.strip():
+                                try:
+                                    chunk_data = json.loads(line)
+                                    delta = chunk_data.get("message", {}).get("content", "")
+                                    if delta:
+                                        yield delta
+                                except Exception:
+                                    continue
+                return
+            except Exception as e:
+                logger.error(f"Ollama streaming call failed: {e}. Falling back to simulation.")
+
+        # 2. Azure OpenAI Streaming
         if self.provider == "azure_openai" and self.azure_client is not None:
             try:
                 stream = await self.azure_client.chat.completions.create(

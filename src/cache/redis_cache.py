@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from src.cache.base import SemanticCacheBase
+from src.cache.memory_cache import MemorySemanticCache
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -21,6 +22,7 @@ class RedisSemanticCache(SemanticCacheBase):
     Redis-backed Semantic Vector Cache.
     Stores query embeddings, checks cosine similarity > 0.92,
     and returns cached synthesis with sub-25ms latency.
+    Seamlessly falls back to high-performance in-memory cache if Redis is offline.
     """
 
     INDEX_NAME = "idx:semantic_cache"
@@ -39,6 +41,13 @@ class RedisSemanticCache(SemanticCacheBase):
         self.dimension = dimension
         self.client: Optional[Any] = None
         self._index_initialized = False
+        self._memory_fallback: Optional[MemorySemanticCache] = None
+        self._redis_failed: bool = False
+
+    def _get_fallback(self) -> MemorySemanticCache:
+        if self._memory_fallback is None:
+            self._memory_fallback = MemorySemanticCache(default_ttl_seconds=self.default_ttl)
+        return self._memory_fallback
 
     async def _get_client(self):
         if self.client is None and aioredis is not None:
@@ -107,10 +116,13 @@ class RedisSemanticCache(SemanticCacheBase):
         """
         Query Redis vector index or scan cached keys for cosine similarity match >= threshold.
         """
+        if self._redis_failed:
+            return await self._get_fallback().get(query, query_vector, similarity_threshold)
+
         threshold = similarity_threshold if similarity_threshold is not None else self.similarity_threshold
         client = await self._get_client()
         if client is None:
-            return None
+            return await self._get_fallback().get(query, query_vector, similarity_threshold)
 
         t_start = time.perf_counter()
         q_vec = np.array(query_vector, dtype=np.float32)
@@ -129,54 +141,45 @@ class RedisSemanticCache(SemanticCacheBase):
                     "2",
                     "query_vec",
                     q_bytes,
-                    "SORTBY",
+                    "RETURN",
+                    "3",
+                    "answer",
+                    "sources",
                     "vector_score",
-                    "ASC",
                     "DIALECT",
                     "2",
                 )
-                if res and res[0] > 0:
-                    # Parse RediSearch results
-                    doc_fields = res[2]
-                    field_dict = {}
-                    for i in range(0, len(doc_fields), 2):
-                        k = doc_fields[i].decode("utf-8") if isinstance(doc_fields[i], bytes) else doc_fields[i]
-                        v = doc_fields[i + 1]
-                        field_dict[k] = v
+                if res and len(res) > 1 and res[0] > 0:
+                    props = res[2]
+                    score_idx = props.index(b"vector_score") if b"vector_score" in props else -1
+                    ans_idx = props.index(b"answer") if b"answer" in props else -1
+                    src_idx = props.index(b"sources") if b"sources" in props else -1
 
-                    # Cosine distance in Redis = 1 - cosine_similarity
-                    distance = float(field_dict.get("vector_score", 1.0))
-                    similarity = 1.0 - distance
+                    if score_idx != -1 and ans_idx != -1:
+                        dist = float(props[score_idx + 1])
+                        sim_score = 1.0 - dist
+                        if sim_score >= threshold:
+                            answer = props[ans_idx + 1].decode("utf-8")
+                            sources_raw = props[src_idx + 1].decode("utf-8") if src_idx != -1 else "[]"
+                            sources = json.loads(sources_raw)
+                            elapsed_ms = (time.perf_counter() - t_start) * 1000
+                            logger.info(f"Redis Semantic Cache HIT ({elapsed_ms:.2f}ms, score: {sim_score:.4f})")
+                            return (answer, sources, sim_score)
 
-                    if similarity >= threshold:
-                        answer = field_dict.get("answer", b"").decode("utf-8")
-                        sources_raw = field_dict.get("sources", b"[]").decode("utf-8")
-                        sources = json.loads(sources_raw)
-                        elapsed_ms = (time.perf_counter() - t_start) * 1000
-                        logger.info(
-                            f"Redis Semantic Cache HIT via RediSearch ({elapsed_ms:.2f}ms, score: {similarity:.4f})"
-                        )
-                        return (answer, sources, similarity)
-
-            # Attempt 2: Pipelined scan fallback (standard Redis)
+            # Attempt 2: Fallback in-memory scan across keys
             keys = await client.keys(f"{self.PREFIX}*")
             if not keys:
                 return None
 
             best_sim = -1.0
-            best_data: Optional[Dict[str, Any]] = None
+            best_data = None
+            norm_q = np.linalg.norm(q_vec)
 
-            pipe = client.pipeline()
-            for k in keys[:100]:  # Evaluate recent active keys
-                pipe.hgetall(k)
-            results = await pipe.execute()
-
-            for entry in results:
+            for key in keys[:50]:
+                entry = await client.hgetall(key)
                 if not entry or b"vector" not in entry:
                     continue
-                v_bytes = entry[b"vector"]
-                stored_vec = np.frombuffer(v_bytes, dtype=np.float32)
-                norm_q = np.linalg.norm(q_vec)
+                stored_vec = np.frombuffer(entry[b"vector"], dtype=np.float32)
                 norm_s = np.linalg.norm(stored_vec)
                 if norm_q > 0 and norm_s > 0:
                     sim = float(np.dot(q_vec, stored_vec) / (norm_q * norm_s))
@@ -192,7 +195,9 @@ class RedisSemanticCache(SemanticCacheBase):
                 return (answer, sources, best_sim)
 
         except Exception as e:
-            logger.warning(f"Error querying Redis semantic cache: {e}")
+            logger.warning(f"Error querying Redis semantic cache: {e}. Switching to in-memory fallback.")
+            self._redis_failed = True
+            return await self._get_fallback().get(query, query_vector, similarity_threshold)
 
         return None
 
@@ -205,9 +210,12 @@ class RedisSemanticCache(SemanticCacheBase):
         ttl_seconds: Optional[int] = None,
     ) -> bool:
         """Store query embedding, answer, and sources with TTL."""
+        if self._redis_failed:
+            return await self._get_fallback().set(query, query_vector, answer, sources, ttl_seconds)
+
         client = await self._get_client()
         if client is None:
-            return False
+            return await self._get_fallback().set(query, query_vector, answer, sources, ttl_seconds)
 
         ttl = ttl_seconds or self.default_ttl
         key = f"{self.PREFIX}{abs(hash(query))}_{int(time.time()*1000)}"
@@ -225,14 +233,18 @@ class RedisSemanticCache(SemanticCacheBase):
             await client.expire(key, ttl)
             return True
         except Exception as e:
-            logger.error(f"Failed writing to Redis semantic cache: {e}")
-            return False
+            logger.warning(f"Failed writing to Redis semantic cache: {e}. Switching to in-memory fallback.")
+            self._redis_failed = True
+            return await self._get_fallback().set(query, query_vector, answer, sources, ttl_seconds)
 
     async def invalidate(self, query: Optional[str] = None) -> int:
         """Invalidate single entry or entire prefix."""
+        if self._redis_failed:
+            return await self._get_fallback().invalidate(query)
+
         client = await self._get_client()
         if client is None:
-            return 0
+            return await self._get_fallback().invalidate(query)
 
         try:
             if query is None:
@@ -251,15 +263,18 @@ class RedisSemanticCache(SemanticCacheBase):
                         removed += 1
                 return removed
         except Exception as e:
-            logger.error(f"Error invalidating Redis cache: {e}")
-            return 0
+            logger.warning(f"Error invalidating Redis cache: {e}. Switching to in-memory fallback.")
+            self._redis_failed = True
+            return await self._get_fallback().invalidate(query)
 
     async def health(self) -> bool:
-        """Verify Redis ping."""
+        """Verify Redis ping or fallback health."""
+        if self._redis_failed:
+            return await self._get_fallback().health()
         try:
             client = await self._get_client()
             if client is None:
-                return False
+                return await self._get_fallback().health()
             return await client.ping()
         except Exception:
-            return False
+            return await self._get_fallback().health()

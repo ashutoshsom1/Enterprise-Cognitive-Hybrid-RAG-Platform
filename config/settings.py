@@ -71,10 +71,19 @@ class Settings(BaseSettings):
     RERANKER_BATCH_SIZE: int = Field(default=32, description="Batch size for cross-encoder inference")
 
     # Synthesis LLM Providers
-    DEFAULT_LLM_PROVIDER: Literal["openai", "azure_openai", "anthropic", "vllm"] = Field(
-        default="openai",
-        description="Default LLM synthesis provider",
+    DEFAULT_LLM_PROVIDER: Literal["openai", "azure_openai", "anthropic", "vllm", "ollama"] = Field(
+        default="ollama",
+        description="Default LLM synthesis provider (ollama, openai, azure_openai, anthropic, vllm)",
     )
+    # Local Ollama Configuration
+    OLLAMA_BASE_URL: str = Field(default="http://localhost:11434", description="Ollama server base URL")
+    OLLAMA_MODEL: str = Field(default="gemma4:e2b", description="Ollama chat model for synthesis (e.g. gemma4:e2b, qwen3.5:9b)")
+    OLLAMA_EMBEDDING_MODEL: str = Field(default="nomic-embed-text", description="Ollama embedding model (e.g. nomic-embed-text)")
+    EMBEDDING_PROVIDER: Literal["openai", "ollama", "auto"] = Field(
+        default="auto",
+        description="Embedding provider strategy: 'auto' checks Ollama then OpenAI key, with deterministic fallback",
+    )
+
     OPENAI_API_KEY: Optional[str] = Field(default=None, description="OpenAI API Key")
     OPENAI_MODEL: str = Field(default="gpt-4o", description="OpenAI chat completion model")
 

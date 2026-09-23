@@ -3,10 +3,11 @@
 import hashlib
 import time
 from typing import Any, Dict, List, Optional, Tuple
+import httpx
 import numpy as np
 
 from config.logging_config import get_logger
-from config.settings import get_settings
+from config.settings import Settings, get_settings
 from src.api.schemas import DocumentChunk, DocumentMetadata, ScoredChunk
 
 logger = get_logger(__name__)
@@ -35,15 +36,19 @@ class DenseRetriever:
         qdrant_url: Optional[str] = None,
         api_key: Optional[str] = None,
         collection_name: Optional[str] = None,
-        dimension: int = 3072,
-        embedding_model: str = "text-embedding-3-large",
+        dimension: Optional[int] = None,
+        embedding_model: Optional[str] = None,
+        embedding_provider: Optional[str] = None,
+        ollama_base_url: Optional[str] = None,
+        ollama_embedding_model: Optional[str] = None,
+        settings: Optional[Settings] = None,
     ):
-        settings = get_settings()
-        self.qdrant_url = qdrant_url or settings.QDRANT_URL
-        self.api_key = api_key or settings.QDRANT_API_KEY
-        self.collection_name = collection_name or settings.QDRANT_COLLECTION_NAME
-        self.dimension = dimension or settings.EMBEDDING_DIMENSION
-        self.embedding_model = embedding_model or settings.EMBEDDING_MODEL
+        s = settings or get_settings()
+        self.qdrant_url = qdrant_url or s.QDRANT_URL
+        self.api_key = api_key or s.QDRANT_API_KEY
+        self.collection_name = collection_name or s.QDRANT_COLLECTION_NAME
+        self.dimension = dimension if dimension is not None else s.EMBEDDING_DIMENSION
+        self.embedding_model = embedding_model or s.EMBEDDING_MODEL
 
         self.qdrant_client: Optional[Any] = None
         self._qdrant_available = False
@@ -52,10 +57,15 @@ class DenseRetriever:
         self._memory_chunks: Dict[str, DocumentChunk] = {}
         self._memory_vectors: Dict[str, np.ndarray] = {}
 
+        # Embedding configuration
+        self.ollama_base_url = ollama_base_url or s.OLLAMA_BASE_URL
+        self.ollama_embedding_model = ollama_embedding_model or s.OLLAMA_EMBEDDING_MODEL
+        self.embedding_provider = embedding_provider or s.EMBEDDING_PROVIDER
+
         # OpenAI client for real embeddings if configured
         self._openai_client: Optional[Any] = None
-        if settings.OPENAI_API_KEY and AsyncOpenAI is not None:
-            self._openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        if s.OPENAI_API_KEY and AsyncOpenAI is not None:
+            self._openai_client = AsyncOpenAI(api_key=s.OPENAI_API_KEY)
 
         self._init_qdrant()
 
@@ -97,9 +107,28 @@ class DenseRetriever:
 
     async def get_embedding(self, text: str) -> List[float]:
         """
-        Generates dense vector embedding. Uses OpenAI text-embedding-3-large
-        when API key is present, otherwise generates a deterministic normalized vector.
+        Generates dense vector embedding.
+        Uses Ollama local model when available, or OpenAI when configured,
+        with deterministic normalized vector fallback.
         """
+        if self.embedding_provider in ("ollama", "auto"):
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(
+                        f"{self.ollama_base_url}/api/embed",
+                        json={"model": self.ollama_embedding_model, "input": text},
+                    )
+                    if resp.status_code == 200:
+                        embs = resp.json().get("embeddings", [])
+                        if embs and len(embs[0]) > 0:
+                            emb = embs[0]
+                            if len(emb) != self.dimension:
+                                self.dimension = len(emb)
+                            return emb
+            except Exception as e:
+                if self.embedding_provider == "ollama":
+                    logger.warning(f"Ollama embedding failed: {e}. Falling back to secondary provider.")
+
         if self._openai_client is not None:
             try:
                 response = await self._openai_client.embeddings.create(
@@ -118,6 +147,33 @@ class DenseRetriever:
             vec = vec / norm
         return vec.tolist()
 
+    async def get_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+        """Batch embedding generation with Ollama fast multi-vector endpoint."""
+        if not texts:
+            return []
+
+        if self.embedding_provider in ("ollama", "auto"):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        f"{self.ollama_base_url}/api/embed",
+                        json={"model": self.ollama_embedding_model, "input": texts},
+                    )
+                    if resp.status_code == 200:
+                        embs = resp.json().get("embeddings", [])
+                        if len(embs) == len(texts):
+                            if len(embs[0]) != self.dimension:
+                                self.dimension = len(embs[0])
+                            return embs
+            except Exception as e:
+                logger.warning(f"Ollama batch embedding failed: {e}. Falling back to individual embeddings.")
+
+        embeddings = []
+        for text in texts:
+            emb = await self.get_embedding(text)
+            embeddings.append(emb)
+        return embeddings
+
     async def index_chunks(self, chunks: List[DocumentChunk], embeddings: Optional[List[List[float]]] = None) -> int:
         """Indexes document chunks with embeddings into dense store."""
         if not chunks:
@@ -125,10 +181,7 @@ class DenseRetriever:
 
         # Generate embeddings if not passed
         if embeddings is None:
-            embeddings = []
-            for chunk in chunks:
-                emb = await self.get_embedding(chunk.content)
-                embeddings.append(emb)
+            embeddings = await self.get_embeddings_batch([c.content for c in chunks])
 
         # Index in Qdrant if available
         if self._qdrant_available and self.qdrant_client is not None and qmodels is not None:
